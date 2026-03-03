@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getOpenAI } from "@/lib/openai";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { resolveSpotifyPlaylist } from "@/lib/spotify";
+import { resolveYoutubePlaylist } from "@/lib/youtube";
 
 type RoastMetricsRaw = {
   originalidade?: number;
@@ -38,11 +40,32 @@ export async function POST(req: Request) {
       );
     }
 
+    let tracksFetched: string[] = [];
+
+    try {
+      if (spotifyUrl) {
+        tracksFetched = await resolveSpotifyPlaylist(spotifyUrl);
+      } else if (youtubeUrl) {
+        tracksFetched = await resolveYoutubePlaylist(youtubeUrl);
+      }
+    } catch (err: any) {
+      return NextResponse.json(
+        { error: err.message || "Erro ao tentar ler a playlist informada." },
+        { status: 400 }
+      );
+    }
+
+    if (tracksFetched.length === 0) {
+      return NextResponse.json(
+        { error: "Nenhuma música encontrada nessa playlist (ela pode ser privada ou estar vazia)." },
+        { status: 400 }
+      );
+    }
+
     const playlistContext = `
-URLs fornecidas:
-- Spotify: ${spotifyUrl || "nenhuma"}
-- YouTube: ${youtubeUrl || "nenhuma"}
-`.trim();
+      Músicas extraídas da playlist:
+      ${tracksFetched.map(track => `- ${track}`).join("\n")}
+    `.trim();
 
     const openai = getOpenAI();
 
@@ -58,7 +81,7 @@ URLs fornecidas:
         {
           role: "user",
           content: `
-O usuário enviou a(s) seguinte(s) playlist(s). Você NÃO tem acesso às músicas reais, então deduza o contexto pelo pouco que sabe (URLs, plataforma, vibe geral) e invente um roast criativo e engraçado.
+O usuário enviou a(s) seguinte(s) playlist(s). Você recebeu uma **lista real das músicas contidas nela**. Use os nomes das músicas e dos artistas para deduzir e inventar um roast criativo, super afiado e engraçado.
 
 Regras importantes:
 - responda APENAS em JSON válido, sem texto fora do JSON
@@ -75,11 +98,12 @@ Regras importantes:
 }
 
 Guia de tom:
-- seja sarcástico, mas divertido
+- seja sarcástico, crítico com muito humor indesejado
+- cite nominalmente artistas e faixas encontradas na lista de músicas (seja cruel, mas lúdico com o gosto do ouvinte)
 - faça piadas com gosto musical, vibe da playlist, clichês de algoritmo, energia de término de relacionamento, etc.
 - NÃO seja ofensivo com grupos específicos, mantenha o humor focado no gosto musical da pessoa.
 
-Agora gere o JSON para esta playlist:
+Agora gere o JSON para esta playlist com base nas músicas extraídas abaixo:
 
 ${playlistContext}
         `.trim(),
