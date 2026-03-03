@@ -82,9 +82,11 @@ export default function Home() {
   const [anonymous, setAnonymous] = useState(false);
   const [step, setStep] = useState<AppStep>("home");
   const [userName, setUserName] = useState("");
+  const [loading, setLoading] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [result, setResult] = useState<RoastResult | null>(null);
   const [error, setError] = useState("");
+  const [urlError, setUrlError] = useState("");
   const [pixCode, setPixCode] = useState("");
   const [pixQrImage, setPixQrImage] = useState("");
   const [roastId, setRoastId] = useState("");
@@ -131,17 +133,40 @@ export default function Home() {
     return () => clearInterval(iv);
   }, [step]);
 
-  const handleDestroy = () => {
+  const handleUrlChange = (val: string) => {
+    setUrl(val);
+    if (!val) {
+      setUrlError("");
+      return;
+    }
+
+    const { success, error } = providerPlaylistUrlSchema.safeParse(val);
+
+    if (!success) {
+      setUrlError(error.issues[0].message);
+    } else {
+      setUrlError("");
+    }
+  };
+
+  const handleDestroy = async () => {
     if (!url.trim()) { inputRef.current?.focus(); return; }
+
+    setLoading(true);
+    // Adicionamos um pequeno timeout só pro usuário sentir o clique
+    await new Promise(r => setTimeout(r, 400));
 
     const validation = providerPlaylistUrlSchema.safeParse(url);
     if (!validation.success) {
       // @ts-ignore
       setError(validation.error.errors[0].message);
+      setLoading(false);
       return;
     }
 
     setError("");
+    setLoading(false);
+
     if (anonymous) { setUserName("Anônimo Corajoso"); setStep("payment"); }
     else setStep("name");
   };
@@ -442,19 +467,20 @@ export default function Home() {
 
       {/* INPUT */}
       <div className="w-full max-w-2xl mb-16">
+        {urlError && <p className="text-red-500 text-sm mt-2 px-2">{urlError}</p>}
         <div className="relative flex items-center mb-4">
           <span className="absolute left-4 text-gray-500 text-xl">🎧</span>
           <input
             ref={inputRef}
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => handleUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleDestroy()}
             type="text"
             placeholder="Link do Spotify ou YouTube..."
             className="w-full py-5 pl-12 pr-32 rounded-xl text-lg bg-[#1a1a1a] border border-[#333] text-white focus:border-[#1DB954] focus:outline-none transition-all"
           />
-          <button onClick={handleDestroy} className="absolute right-2 bg-[#1DB954] hover:bg-green-500 text-black font-bold py-3 px-6 rounded-lg transition-all active:scale-95">
-            DESTRUIR
+          <button onClick={handleDestroy} disabled={loading || !!urlError || !url} className="absolute right-2 bg-[#1DB954] hover:bg-green-500 text-black font-bold py-3 px-6 rounded-lg transition-all active:scale-95">
+            {loading ? "JULGANDO..." : "DESTRUIR"}
           </button>
         </div>
         <div className="flex items-center justify-center gap-3 mb-6">

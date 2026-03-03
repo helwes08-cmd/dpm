@@ -43,9 +43,9 @@ const getColor = (value: number) => {
 };
 
 export default function RoastCard({ data }: { data: Roast }) {
-  const randomTags = useMemo(() => {
+  const topTags = useMemo(() => {
     return Object.entries(data.tags ?? {})
-      .sort(() => 0.5 - Math.random())
+      .sort((a, b) => b[1] - a[1]) // Deterministic sort to avoid hydration errors
       .slice(0, 4);
   }, [data]);
 
@@ -63,7 +63,7 @@ export default function RoastCard({ data }: { data: Roast }) {
       </p>
 
       <div className="space-y-4">
-        {randomTags.map(([key, val]) => (
+        {topTags.map(([key, val]) => (
           <div key={key} className="space-y-1">
             <div className="flex justify-between text-[10px] uppercase tracking-widest font-bold text-gray-500">
               <span>{TAG_LABELS[key] || key}</span>
