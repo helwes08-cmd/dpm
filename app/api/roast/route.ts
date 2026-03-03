@@ -21,12 +21,12 @@ function getLLM() {
 }
 
 const ALL_TAGS = [
-  "protagonista","ilusao_amorosa","idade_jurassica","risco_de_overdose",
-  "crente_ou_quase","militante","generico","original","energia_de_termino",
-  "vergonha_alheia","emo","zona_leste","festa_boteco","queen",
-  "gosto_musical_de_schrodinger","provavelmente_canta_errado","gritos_e_riffs",
-  "rebelde","metaleiro_de_apartamento","dj_no_fogao","sofrencia_parcelada",
-  "samba_de_boteco","proibidao",
+  "protagonista", "ilusao_amorosa", "idade_jurassica", "risco_de_overdose",
+  "crente_ou_quase", "militante", "generico", "original", "energia_de_termino",
+  "vergonha_alheia", "emo", "zona_leste", "festa_boteco", "queen",
+  "gosto_musical_de_schrodinger", "provavelmente_canta_errado", "gritos_e_riffs",
+  "rebelde", "metaleiro_de_apartamento", "dj_no_fogao", "sofrencia_parcelada",
+  "samba_de_boteco", "proibidao",
 ];
 
 async function getSpotifyToken(): Promise<string> {
@@ -122,7 +122,7 @@ ${ALL_TAGS.join(", ")}
 Regras: score de 0 a 10, impiedoso. EXATAMENTE 8 tags. Sem markdown fora do JSON.`;
 
     const model = getLLM();
-    const { text } = await generateText({ model, prompt, maxTokens: 700 });
+    const { text } = await generateText({ model, prompt, maxOutputTokens: 700 });
 
     let parsed: any;
     try {
