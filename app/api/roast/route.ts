@@ -4,6 +4,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { resolveAudioTracks } from "@/lib/audio";
 
 // ─── Troque o provider aqui: "openai" | "anthropic" | "google" ───────────────
 function getLLM() {
@@ -29,47 +30,6 @@ const ALL_TAGS = [
   "samba_de_boteco", "proibidao",
 ];
 
-async function getSpotifyToken(): Promise<string> {
-  const res = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: "Basic " + Buffer.from(
-        process.env.SPOTIFY_CLIENT_ID + ":" + process.env.SPOTIFY_CLIENT_SECRET
-      ).toString("base64"),
-    },
-    body: "grant_type=client_credentials",
-  });
-  const data = await res.json();
-  return data.access_token;
-}
-
-function extractSpotifyId(url: string): string | null {
-  const match = url.match(/playlist\/([a-zA-Z0-9]+)/);
-  return match ? match[1] : null;
-}
-
-async function fetchSpotifyTracks(url: string): Promise<string> {
-  try {
-    const id = extractSpotifyId(url);
-    if (!id) return "Playlist do Spotify (ID nao identificado)";
-    const token = await getSpotifyToken();
-    const res = await fetch(
-      `https://api.spotify.com/v1/playlists/${id}/tracks?limit=50&fields=items(track(name,artists))`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const data = await res.json();
-    const tracks: string[] = data.items
-      ?.filter((i: any) => i.track)
-      .map((i: any) => `- ${i.track.name} de ${i.track.artists[0]?.name}`) ?? [];
-    return tracks.length > 0
-      ? `Musicas da playlist:\n${tracks.join("\n")}`
-      : "Playlist do Spotify (sem faixas publicas)";
-  } catch {
-    return `Playlist do Spotify: ${url}`;
-  }
-}
-
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -80,20 +40,14 @@ export async function POST(req: Request) {
     let spotifyUrl: string | undefined;
     let youtubeUrl: string | undefined;
 
-    if (raw.includes("spotify.com")) spotifyUrl = raw;
-    else if (raw.includes("youtube.com") || raw.includes("youtu.be")) youtubeUrl = raw;
+    if (raw.includes("youtube.com") || raw.includes("youtu.be")) youtubeUrl = raw;
     else if (raw) spotifyUrl = raw;
 
     if (!spotifyUrl && !youtubeUrl) {
       return NextResponse.json({ error: "Cole o link da playlist." }, { status: 400 });
     }
 
-    let playlistContext: string;
-    if (spotifyUrl) {
-      playlistContext = await fetchSpotifyTracks(spotifyUrl);
-    } else {
-      playlistContext = `Playlist do YouTube: ${youtubeUrl}`;
-    }
+    const playlistContext = await resolveAudioTracks(raw);
 
     const prompt = `Voce e uma IA critica musical brasileira - acida, criativa, engracada e sem papas na lingua.
 Analise a playlist abaixo e destrua o gosto musical da pessoa com humor afiado e original.
