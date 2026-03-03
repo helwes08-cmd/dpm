@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
 import RoastCard from "../components/RoastCard";
+
+const playlistUrlSchema = z
+  .string()
+  .url("Isso não parece ser um link válido...")
+  .refine((url) => ["spotify.com", "open.spotify.com", "music.youtube.com", "youtube.com"].some((domain) => url.includes(domain)), {
+    message: "O link precisa ser do Spotify ou YouTube Music!",
+  });
+
 
 type RecentRoast = {
   id: string;
@@ -13,16 +22,34 @@ type RecentRoast = {
 
 export default function Home() {
   const [url, setUrl] = useState("");
+  const [urlError, setUrlError] = useState("");
   const [anonymous, setAnonymous] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RecentRoast | null>(null); // Resultado da IA atual
   const [recent, setRecent] = useState<RecentRoast[]>([]);
   const resultRef = useRef<HTMLDivElement | null>(null);
 
+  const handleUrlChange = (val: string) => {
+    setUrl(val);
+    if (!val) {
+      setUrlError("");
+      return;
+    }
+
+    const { success, error } = playlistUrlSchema.safeParse(val);
+    
+    if (!success) {
+      setUrlError(error.issues[0].message);
+    } else {
+      setUrlError("");
+    }
+  };
+
   // Função para chamar a API real que criamos
   const destroyPlaylist = async () => {
-    if (!url.includes("spotify.com")) {
-      alert("Por favor, cole um link válido do Spotify!");
+    const result = playlistUrlSchema.safeParse(url);
+    if (!result.success) {
+      setUrlError(result.error.issues[0].message);
       return;
     }
 
@@ -53,7 +80,7 @@ export default function Home() {
       };
 
       setResult(newRoast);
-      
+
       // Adiciona ao mural se não for anônimo
       if (!anonymous) {
         setRecent((prev) => [newRoast, ...prev].slice(0, 10));
@@ -81,24 +108,28 @@ export default function Home() {
       </p>
 
       <div className="w-full max-w-2xl mb-16">
-        <div className="relative flex items-center mb-4">
-          <span className="absolute left-4 text-gray-500 text-xl">🎧</span>
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            type="text"
-            placeholder="Link da playlist do Spotify..."
-            className="w-full py-5 pl-12 pr-32 rounded-xl text-lg bg-[#1a1a1a] border border-[#333] text-white focus:border-[#1DB954] focus:outline-none transition-all"
-          />
-          <button 
-            onClick={destroyPlaylist}
-            disabled={loading}
-            className="absolute right-2 bg-[#1DB954] hover:bg-green-500 disabled:bg-gray-700 text-black font-bold py-3 px-6 rounded-lg transition-all active:scale-95"
-          >
-            {loading ? "JULGANDO..." : "DESTRUIR"}
-          </button>
+        <div className="relative flex flex-col mb-4">
+          <div className="relative flex items-center w-full">
+            <span className="absolute left-4 text-gray-500 text-xl">🎧</span>
+            <input
+              value={url}
+              onChange={(e) => handleUrlChange(e.target.value)}
+              type="text"
+              placeholder="Link da playlist do Spotify ou YouTube Music..."
+              className={`w-full py-5 pl-12 pr-32 rounded-xl text-lg bg-[#1a1a1a] border text-white focus:outline-none transition-all ${urlError ? "border-red-500 focus:border-red-500" : "border-[#333] focus:border-[#1DB954]"
+                }`}
+            />
+            <button
+              onClick={destroyPlaylist}
+              disabled={loading || !!urlError || !url}
+              className="absolute right-2 bg-[#1DB954] hover:bg-green-500 disabled:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3 px-6 rounded-lg transition-all active:scale-95"
+            >
+              {loading ? "JULGANDO..." : "DESTRUIR"}
+            </button>
+          </div>
+          {urlError && <p className="text-red-500 text-sm mt-2 px-2">{urlError}</p>}
         </div>
-        
+
         <div className="flex items-center justify-center gap-3 mb-6">
           <label className="flex items-center cursor-pointer select-none">
             <div className="relative">
@@ -114,8 +145,8 @@ export default function Home() {
       {/* EXIBE O RESULTADO ATUAL AQUI */}
       {result && (
         <div ref={resultRef} className="w-full max-w-2xl mb-20 animate-in fade-in zoom-in duration-500">
-           <h2 className="text-center text-[#1DB954] font-bold mb-4 uppercase tracking-widest">O Veredito:</h2>
-           <RoastCard data={result} />
+          <h2 className="text-center text-[#1DB954] font-bold mb-4 uppercase tracking-widest">O Veredito:</h2>
+          <RoastCard data={result} />
         </div>
       )}
 
