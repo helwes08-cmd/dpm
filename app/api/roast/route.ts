@@ -5,6 +5,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { resolveAudioTracks } from "@/lib/audio";
+import { providerPlaylistUrlSchema } from "@/lib/validation";
 
 // ─── Troque o provider aqui: "openai" | "anthropic" | "google" ───────────────
 function getLLM() {
@@ -37,15 +38,17 @@ export async function POST(req: Request) {
     const anonymous: boolean = Boolean(body.anonymous);
 
     const raw: string = (body.url || body.spotifyUrl || body.spotify_url || "").trim();
+    const validation = providerPlaylistUrlSchema.safeParse(raw);
+    if (!validation.success) {
+      // @ts-ignore
+      return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
+    }
+
     let spotifyUrl: string | undefined;
     let youtubeUrl: string | undefined;
 
     if (raw.includes("youtube.com") || raw.includes("youtu.be")) youtubeUrl = raw;
     else if (raw) spotifyUrl = raw;
-
-    if (!spotifyUrl && !youtubeUrl) {
-      return NextResponse.json({ error: "Cole o link da playlist." }, { status: 400 });
-    }
 
     const playlistContext = await resolveAudioTracks(raw);
 

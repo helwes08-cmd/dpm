@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import RoastCard from "../components/RoastCard";
+import { providerPlaylistUrlSchema } from "../lib/validation";
 
 type AppStep = "home" | "name" | "payment" | "loading" | "result";
 
@@ -41,10 +42,10 @@ function pickThree(arr: string[]) {
 }
 
 const MOCK_RECENT: RecentRoast[] = [
-  { id: "1", userName: "Enzo_ofc",     score: 2.3, roast: "Sua playlist tem cheiro de pod de uva e falta de atenção paterna.",        tags: { generico: 8, energia_de_termino: 7 } },
-  { id: "2", userName: "Crente_Top",   score: 4.5, roast: "Ouvir esse gospel ostentação não vai perdoar seus vacilos no sigilo.",      tags: { crente_ou_quase: 9, militante: 5 } },
-  { id: "3", userName: "Fritador_011", score: 1.2, roast: "Seu cérebro já virou patê de tanto ouvir esse techno de batedeira.",        tags: { dj_no_fogao: 8, risco_de_overdose: 6 } },
-  { id: "4", userName: "Mili_Tante",   score: 3.8, roast: "A gente sabe que você não ouve a música, só usa pra validar sua bio do X.", tags: { militante: 9, protagonista: 7 } },
+  { id: "1", userName: "Enzo_ofc", score: 2.3, roast: "Sua playlist tem cheiro de pod de uva e falta de atenção paterna.", tags: { generico: 8, energia_de_termino: 7 } },
+  { id: "2", userName: "Crente_Top", score: 4.5, roast: "Ouvir esse gospel ostentação não vai perdoar seus vacilos no sigilo.", tags: { crente_ou_quase: 9, militante: 5 } },
+  { id: "3", userName: "Fritador_011", score: 1.2, roast: "Seu cérebro já virou patê de tanto ouvir esse techno de batedeira.", tags: { dj_no_fogao: 8, risco_de_overdose: 6 } },
+  { id: "4", userName: "Mili_Tante", score: 3.8, roast: "A gente sabe que você não ouve a música, só usa pra validar sua bio do X.", tags: { militante: 9, protagonista: 7 } },
 ];
 
 const SCORE_LABEL = (s: number) =>
@@ -132,6 +133,14 @@ export default function Home() {
 
   const handleDestroy = () => {
     if (!url.trim()) { inputRef.current?.focus(); return; }
+
+    const validation = providerPlaylistUrlSchema.safeParse(url);
+    if (!validation.success) {
+      // @ts-ignore
+      setError(validation.error.errors[0].message);
+      return;
+    }
+
     setError("");
     if (anonymous) { setUserName("Anônimo Corajoso"); setStep("payment"); }
     else setStep("name");
@@ -217,7 +226,7 @@ export default function Home() {
     }
   };
   const shareWhatsapp = () => window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank");
-  const shareTwitter  = () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`, "_blank");
+  const shareTwitter = () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`, "_blank");
   const shareFacebook = () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent("https://destroyaplaylist.com")}&quote=${encodeURIComponent(shareText)}`, "_blank");
 
   // ─── LOADING ─────────────────────────────────────────────────────────────────
@@ -388,8 +397,8 @@ export default function Home() {
               A humilhação custa R$ 4,97
             </h2>
             <p className="text-[#1DB954]/80 text-xs mb-5">
-  Se não puder pagar os 4,97, a humilhação é ainda maior.
-</p>
+              Se não puder pagar os 4,97, a humilhação é ainda maior.
+            </p>
             {pixQrImage ? (
               <img src={`data:image/png;base64,${pixQrImage}`} alt="QR Code PIX" className="mx-auto mb-4 w-36 h-36 rounded-xl" />
             ) : (
@@ -411,10 +420,10 @@ export default function Home() {
               )}
             </div>
             {(roastId.startsWith("dev-") || process.env.NODE_ENV === "development") && (
-  <button onClick={handleDevSkipPayment} className="w-full bg-[#1DB954] hover:bg-[#1ed760] text-black font-black py-4 rounded-xl text-sm tracking-widest uppercase transition-all active:scale-95 mb-3" style={{ boxShadow: "0 4px 20px rgba(29,185,84,0.3)" }}>
-    🛠 DEV: Pular Pagamento
-  </button>
-)}
+              <button onClick={handleDevSkipPayment} className="w-full bg-[#1DB954] hover:bg-[#1ed760] text-black font-black py-4 rounded-xl text-sm tracking-widest uppercase transition-all active:scale-95 mb-3" style={{ boxShadow: "0 4px 20px rgba(29,185,84,0.3)" }}>
+                🛠 DEV: Pular Pagamento
+              </button>
+            )}
             <button onClick={() => setStep("home")} className="text-xs text-gray-700 hover:text-gray-500 transition-colors uppercase tracking-widest block w-full">
               Voltar
             </button>
