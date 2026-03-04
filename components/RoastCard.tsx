@@ -54,7 +54,7 @@ export default function RoastCard({ data }: { data: Roast }) {
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-white font-bold truncate">Playlist de {data.userName}</h3>
         <span className="bg-[#1DB954] text-black font-black px-2 py-0.5 rounded text-sm italic">
-          {data.score.toFixed(1)}/10
+          {data?.score?.toFixed(1)}/10
         </span>
       </div>
 

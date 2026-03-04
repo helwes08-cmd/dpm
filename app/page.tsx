@@ -95,8 +95,22 @@ export default function Home() {
   const [loadingIndex, setLoadingIndex] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [pixStatus, setPixStatus] = useState<"waiting" | "checking" | "paid">("waiting");
+  const [recentRoasts, setRecentRoasts] = useState<RecentRoast[]>(MOCK_RECENT);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Busca os roasts reais
+    fetch("/api/recent")
+      .then(res => res.json())
+      .then(data => {
+        debugger
+        if (data.roasts && data.roasts.length > 0) {
+          setRecentRoasts(data.roasts);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (step !== "payment" || !roastId || roastId.startsWith("dev-")) return;
@@ -316,12 +330,12 @@ export default function Home() {
           <div className="flex items-center justify-center gap-4 mb-6 py-4 rounded-2xl border border-[#1DB954]/10 bg-[#1DB954]/5">
             <div className="text-center">
               <p className="text-[#1DB954] font-black leading-none" style={{ fontSize: "4rem", textShadow: "0 0 30px rgba(29,185,84,0.6)", fontFamily: "'Arial Black', sans-serif" }}>
-                {result.score.toFixed(1)}
+                {result?.score?.toFixed(1)}
               </p>
               <p className="text-gray-600 text-xs tracking-widest">/10</p>
             </div>
             <div className="h-12 w-px bg-[#1DB954]/20" />
-            <p className="text-base text-white font-black">{SCORE_LABEL(result.score)}</p>
+            <p className="text-base text-white font-black">{SCORE_LABEL(result?.score)}</p>
           </div>
 
           {/* Roast — sem aspas, sem itálico, texto maior */}
@@ -502,7 +516,7 @@ export default function Home() {
           <span>🔥</span> RECENTEMENTE DESTRUÍDAS
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-          {MOCK_RECENT.map((item) => <RoastCard key={item.id} data={item} />)}
+          {recentRoasts.map((item) => <RoastCard key={item.id} data={item} />)}
         </div>
       </div>
 

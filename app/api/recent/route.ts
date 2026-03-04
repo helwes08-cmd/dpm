@@ -8,7 +8,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("playlist_roasts")
       .select(
-        "id, score, roast, spotify_url, youtube_url, created_at, originalidade, influencia_do_algoritmo, energia_de_termino, vergonha_alheia",
+      "*",
       )
       .order("created_at", { ascending: false })
       .limit(10);
@@ -16,10 +16,10 @@ export async function GET() {
     if (error) {
       // eslint-disable-next-line no-console
       console.error("Erro ao buscar playlists recentes:", error);
-      return NextResponse.json({ recent: [] });
+      return NextResponse.json({ roasts: [] });
     }
 
-    const recent =
+    const roasts =
       data?.map((row) => ({
         id: row.id,
         score: row.score,
@@ -35,12 +35,12 @@ export async function GET() {
         },
       })) ?? [];
 
-    return NextResponse.json({ recent });
+    return NextResponse.json({ roasts });
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Erro de configuração do Supabase:", error);
     // Não quebrar o site — apenas não mostrar dados recentes
-    return NextResponse.json({ recent: [] });
+    return NextResponse.json({ roasts: [] });
   }
 }
 

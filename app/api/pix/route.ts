@@ -45,6 +45,10 @@ export async function POST(req: NextRequest) {
 
     const billing = await res.json();
 
+    if(!billing.success) {
+      throw new Error(billing.error);
+    }
+
     // Salva payment_id
     await supabase
       .from("playlist_roasts")
