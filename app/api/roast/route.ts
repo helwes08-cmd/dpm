@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { generateText } from "ai";
+import { generateText, Output } from "ai";
+import { z } from "zod";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -23,19 +24,20 @@ function getLLM() {
 }
 
 const ALL_TAGS = [
-  "protagonista", "ilusao_amorosa", "idade_jurassica", "risco_de_overdose",
-  "crente_ou_quase", "militante", "generico", "original", "energia_de_termino",
-  "vergonha_alheia", "emo", "zona_leste", "festa_boteco", "queen",
-  "gosto_musical_de_schrodinger", "provavelmente_canta_errado", "gritos_e_riffs",
-  "rebelde", "metaleiro_de_apartamento", "dj_no_fogao", "sofrencia_parcelada",
-  "samba_de_boteco", "proibidao",
-];
+  "protagonista", "ilusaoAmorosa", "idadeJurassica", "riscoDeOverdose",
+  "crenteOuQuase", "militante", "generico", "original", "energiaDeTermino",
+  "vergonhaAlheia", "emo", "zonaLeste", "festaBoteco", "queen",
+  "gostoMusicalDeSchrodinger", "provavelmenteCantaErrado", "gritosERiffs",
+  "rebelde", "metaleiroDeApartamento", "djNoFogao", "sofrenciaParcelada",
+  "sambaDeBoteco", "proibidao",
+] as const;
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const userName: string = (body.userName || body.user_name || "Anonimo").trim();
     const anonymous: boolean = Boolean(body.anonymous);
+    const roastId: string | undefined = body.roastId;
 
     const raw: string = (body.url || body.spotifyUrl || body.spotify_url || "").trim();
     const validation = providerPlaylistUrlSchema.safeParse(raw);
@@ -57,68 +59,81 @@ Analise a playlist abaixo e destrua o gosto musical da pessoa com humor afiado e
 
 ${playlistContext}
 
-Responda SOMENTE com JSON valido, sem texto fora do JSON:
-{
-  "score": 4.2,
-  "roast": "comentario devastador em portugues brasileiro, minimo 200 e maximo 350 caracteres, especifico sobre o estilo das musicas, sem cliches obvios",
-  "tags": {
-    "tag1": 7.5,
-    "tag2": 8.1,
-    "tag3": 6.3,
-    "tag4": 9.0,
-    "tag5": 5.5,
-    "tag6": 7.8,
-    "tag7": 4.2,
-    "tag8": 8.9
-  }
-}
+Tags disponiveis: ${ALL_TAGS.join(", ")}
 
-Tags disponiveis - escolha EXATAMENTE 8:
-${ALL_TAGS.join(", ")}
-
-Regras: score de 0 a 10, impiedoso. EXATAMENTE 8 tags. Sem markdown fora do JSON.`;
+Regras: score de 0 a 10, impiedoso.`;
 
     const model = getLLM();
-    const { text } = await generateText({ model, prompt, maxOutputTokens: 700 });
+    const { output } = await generateText({
+      model,
+      prompt,
+      output: Output.object({
+        schema: z.object({
+          score: z.number().min(0).max(10).describe("score de 0 a 10, impiedoso"),
+          roast: z.string().describe("comentario devastador em portugues brasileiro, minimo 200 e maximo 350 caracteres, especifico sobre o estilo das musicas, sem cliches obvios"),
+          tags: z.array(
+            z.object({
+              tag: z.enum(ALL_TAGS).describe("A tag aplicavel ao gosto musical"),
+              score: z.number().min(0).max(10).describe("A aderência do usuario a essa tag (0 a 10)")
+            })
+          ).length(4).describe("Lista de EXATAMENTE 4 tags aplicaveis ao gosto musical da pessoa, selecione aleatoriamente 4 tags das que estão disponíveis")
+        })
+      })
+    });
 
-    let parsed: any;
-    try {
-      parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
-    } catch {
-      const match = text.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error("Resposta da IA nao e JSON valido.");
-      parsed = JSON.parse(match[0]);
-    }
-
-    const score = typeof parsed.score === "number" ? parsed.score : Number(parsed.score) || 0;
-    const roastText = String(parsed.roast || "");
+    const score = output.score;
+    const roastText = output.roast;
     const tags: Record<string, number> = {};
-    for (const [k, v] of Object.entries(parsed.tags ?? {})) {
-      if (ALL_TAGS.includes(k)) tags[k] = Number(v) || 0;
+    for (const item of output.tags) {
+      tags[item.tag] = item.score;
     }
 
     let supabaseId: string | undefined;
     let createdAt: string | undefined;
     try {
-      if (!anonymous) {
+      if (!anonymous || roastId) {
         const supabase = getSupabaseAdmin();
-        const { data, error } = await supabase
-          .from("playlist_roasts")
-          .insert({
-            user_name: userName,
-            spotify_url: spotifyUrl ?? null,
-            youtube_url: youtubeUrl ?? null,
-            anonymous,
-            score,
-            roast: roastText,
-            tags,
-          })
-          .select("id, created_at")
-          .single();
-        if (error) console.error("Supabase insert error:", error);
-        else if (data) {
-          supabaseId = data.id;
-          createdAt = data.created_at;
+
+        if (roastId && !roastId.startsWith("dev-")) {
+          // Atualiza o registro existente previamente criado pelo Pix
+          const { data, error } = await supabase
+            .from("playlist_roasts")
+            .update({
+              score,
+              roast: roastText,
+              tags: Object.keys(tags).length > 0 ? tags : null, // Evita empty object se vazio
+            })
+            .eq("id", roastId)
+            .select("id, created_at")
+            .single();
+
+          if (error) console.error("Supabase update error:", error);
+          else if (data) {
+            supabaseId = data.id;
+            createdAt = data.created_at;
+          }
+        } else if (!anonymous) {
+          // Fallback para dev- mode ou sem processo de pix engatilhado
+          const { data, error } = await supabase
+            .from("playlist_roasts")
+            .insert({
+              user_name: userName,
+              spotify_url: spotifyUrl ?? null,
+              youtube_url: youtubeUrl ?? null,
+              anonymous,
+              score,
+              roast: roastText,
+              tags: Object.keys(tags).length > 0 ? tags : null,
+              paid: true, // Auto aprova em dev local
+            })
+            .select("id, created_at")
+            .single();
+
+          if (error) console.error("Supabase insert error (dev mode):", error);
+          else if (data) {
+            supabaseId = data.id;
+            createdAt = data.created_at;
+          }
         }
       }
     } catch (err) {

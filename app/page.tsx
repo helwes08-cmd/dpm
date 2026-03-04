@@ -22,6 +22,14 @@ type RoastResult = {
   tags: Record<string, number>;
 };
 
+type PendingRoast = {
+  roastId: string;
+  pixLink: string;
+  userName: string;
+  url: string;
+  anonymous: boolean;
+};
+
 const LOADING_PHRASES = [
   "Analisando seu gosto duvidoso…",
   "Detectando padrões de arrependimento…",
@@ -42,9 +50,9 @@ function pickThree(arr: string[]) {
 }
 
 const MOCK_RECENT: RecentRoast[] = [
-  { id: "1", userName: "Enzo_ofc", score: 2.3, roast: "Sua playlist tem cheiro de pod de uva e falta de atenção paterna.", tags: { generico: 8, energia_de_termino: 7 } },
-  { id: "2", userName: "Crente_Top", score: 4.5, roast: "Ouvir esse gospel ostentação não vai perdoar seus vacilos no sigilo.", tags: { crente_ou_quase: 9, militante: 5 } },
-  { id: "3", userName: "Fritador_011", score: 1.2, roast: "Seu cérebro já virou patê de tanto ouvir esse techno de batedeira.", tags: { dj_no_fogao: 8, risco_de_overdose: 6 } },
+  { id: "1", userName: "Enzo_ofc", score: 2.3, roast: "Sua playlist tem cheiro de pod de uva e falta de atenção paterna.", tags: { generico: 8, energiaDeTermino: 7 } },
+  { id: "2", userName: "Crente_Top", score: 4.5, roast: "Ouvir esse gospel ostentação não vai perdoar seus vacilos no sigilo.", tags: { crenteOuQuase: 9, militante: 5 } },
+  { id: "3", userName: "Fritador_011", score: 1.2, roast: "Seu cérebro já virou patê de tanto ouvir esse techno de batedeira.", tags: { djNoFogao: 8, riscoDeOverdose: 6 } },
   { id: "4", userName: "Mili_Tante", score: 3.8, roast: "A gente sabe que você não ouve a música, só usa pra validar sua bio do X.", tags: { militante: 9, protagonista: 7 } },
 ];
 
@@ -53,27 +61,27 @@ const SCORE_LABEL = (s: number) =>
 
 const TAG_LABELS: Record<string, string> = {
   protagonista: "🎭 Protagonista",
-  ilusao_amorosa: "💔 Ilusão Amorosa",
-  idade_jurassica: "🦕 Idade Jurássica",
-  risco_de_overdose: "💊 Risco de Overdose",
-  crente_ou_quase: "✝️ Crente ou Quase",
+  ilusaoAmorosa: "💔 Ilusão Amorosa",
+  idadeJurassica: "🦕 Idade Jurássica",
+  riscoDeOverdose: "💊 Risco de Overdose",
+  crenteOuQuase: "✝️ Crente ou Quase",
   militante: "✊ Militante de Quarto",
   generico: "📊 Influência do Algoritmo",
   original: "✨ Original de Verdade",
-  energia_de_termino: "💨 Energia de Término",
-  vergonha_alheia: "😳 Vergonha Alheia",
+  energiaDeTermino: "💨 Energia de Término",
+  vergonhaAlheia: "😳 Vergonha Alheia",
   emo: "🖤 Emo Raiz",
-  zona_leste: "🏙️ Zona Leste",
-  festa_boteco: "🍺 Festa de Boteco",
+  zonaLeste: "🏙️ Zona Leste",
+  festaBoteco: "🍺 Festa de Boteco",
   queen: "👑 Queen Energy",
-  gosto_musical_de_schrodinger: "🐱 Gosto Musical de Schrödinger",
-  provavelmente_canta_errado: "🎤 Provavelmente Canta Errado",
-  gritos_e_riffs: "🎸 Gritos e Riffs",
+  gostoMusicalDeSchrodinger: "🐱 Gosto Musical de Schrödinger",
+  provavelmenteCantaErrado: "🎤 Provavelmente Canta Errado",
+  gritosERiffs: "🎸 Gritos e Riffs",
   rebelde: "😤 Rebelde Sem Causa",
-  metaleiro_de_apartamento: "🤘 Metaleiro de Apartamento",
-  dj_no_fogao: "🎧 DJ no Fogão",
-  sofrencia_parcelada: "😢 Sofrência Parcelada",
-  samba_de_boteco: "🥁 Samba de Boteco",
+  metaleiroDeApartamento: "🤘 Metaleiro de Apartamento",
+  djNoFogao: "🎧 DJ no Fogão",
+  sofrenciaParcelada: "😢 Sofrência Parcelada",
+  sambaDeBoteco: "🥁 Samba de Boteco",
   proibidao: "🚫 Proibidão",
 };
 
@@ -87,15 +95,15 @@ export default function Home() {
   const [result, setResult] = useState<RoastResult | null>(null);
   const [error, setError] = useState("");
   const [urlError, setUrlError] = useState("");
-  const [pixCode, setPixCode] = useState("");
-  const [pixQrImage, setPixQrImage] = useState("");
+  const [pixLink, setPixLink] = useState("");
   const [roastId, setRoastId] = useState("");
-  const [copied, setCopied] = useState(false);
   const [loadingPhrases] = useState(() => pickThree(LOADING_PHRASES));
   const [loadingIndex, setLoadingIndex] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [pixStatus, setPixStatus] = useState<"waiting" | "checking" | "paid">("waiting");
-  const [recentRoasts, setRecentRoasts] = useState<RecentRoast[]>(MOCK_RECENT);
+  const [recentRoasts, setRecentRoasts] = useState<RecentRoast[]>([]);
+  const [isFetchingRecent, setIsFetchingRecent] = useState(true);
+  const [pendingRoasts, setPendingRoasts] = useState<PendingRoast[]>([]);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -104,34 +112,86 @@ export default function Home() {
     fetch("/api/recent")
       .then(res => res.json())
       .then(data => {
-        debugger
         if (data.roasts && data.roasts.length > 0) {
           setRecentRoasts(data.roasts);
+        } else {
+          setRecentRoasts(MOCK_RECENT);
         }
       })
-      .catch(console.error);
+      .catch((e) => {
+        console.error(e);
+        setRecentRoasts(MOCK_RECENT);
+      })
+      .finally(() => {
+        setIsFetchingRecent(false);
+      });
+
+    // Recupera state do localStorage pra não perder o PIX (agora array para suportar múltiplos)
+    const savedStr = localStorage.getItem("dpm_pending_roasts");
+    if (savedStr) {
+      try {
+        const saved: PendingRoast[] = JSON.parse(savedStr);
+        if (Array.isArray(saved) && saved.length > 0) {
+          setPendingRoasts(saved);
+
+          // Se já tem pendências, restaura a última na tela
+          const last = saved[saved.length - 1];
+          setRoastId(last.roastId);
+          setPixLink(last.pixLink);
+          setUserName(last.userName);
+          setUrl(last.url);
+          setAnonymous(last.anonymous);
+          setStep("payment");
+        }
+      } catch (e) {
+        localStorage.removeItem("dpm_pending_roasts");
+      }
+    }
   }, []);
 
   useEffect(() => {
-    if (step !== "payment" || !roastId || roastId.startsWith("dev-")) return;
+    if (pendingRoasts.length === 0) return;
     pollingRef.current = setInterval(async () => {
-      try {
-        setPixStatus("checking");
-        const res = await fetch(`/api/pix/status?id=${roastId}`);
-        const data = await res.json();
-        if (data.paid) {
-          clearInterval(pollingRef.current!);
-          setPixStatus("paid");
-          setTimeout(() => startRoast(), 800);
+      if (step === "payment") setPixStatus("checking");
+
+      const checks = pendingRoasts.map(async (item) => {
+        if (!item.roastId || item.roastId.startsWith("dev-")) return null;
+        try {
+          const res = await fetch(`/api/pix/status?id=${item.roastId}`);
+          const data = await res.json();
+          if (data.paid) return item;
+        } catch { }
+        return null;
+      });
+
+      const results = await Promise.all(checks);
+      const paidItem = results.find(i => i !== null);
+
+      if (paidItem) {
+        clearInterval(pollingRef.current!);
+
+        // Remove o item pago da fila
+        const updatedPending = pendingRoasts.filter(p => p.roastId !== paidItem.roastId);
+        setPendingRoasts(updatedPending);
+        if (updatedPending.length > 0) {
+          localStorage.setItem("dpm_pending_roasts", JSON.stringify(updatedPending));
         } else {
-          setPixStatus("waiting");
+          localStorage.removeItem("dpm_pending_roasts");
         }
-      } catch {
+
+        // Força a tela para mostrar a finalização deste item específico
+        setRoastId(paidItem.roastId);
+        setUserName(paidItem.userName);
+        setUrl(paidItem.url);
+        setStep("payment");
+        setPixStatus("paid");
+        setTimeout(() => startRoast(paidItem), 800);
+      } else if (step === "payment") {
         setPixStatus("waiting");
       }
     }, 2500);
     return () => clearInterval(pollingRef.current!);
-  }, [step, roastId]);
+  }, [pendingRoasts, step]);
 
   useEffect(() => {
     if (step !== "loading") return;
@@ -199,16 +259,35 @@ export default function Home() {
         body: JSON.stringify({ userName: name, playlistUrl: url, anonymous }),
       });
       const data = await res.json();
-      setPixCode(data.pixCode ?? "");
-      setPixQrImage(data.pixQrCodeImage ?? "");
+      setPixLink(data.link ?? "");
       setRoastId(data.roastId ?? "");
+
+      const newItem: PendingRoast = {
+        roastId: data.roastId,
+        pixLink: data.link,
+        userName: name,
+        url: url,
+        anonymous: anonymous
+      };
+      const updated = [...pendingRoasts, newItem];
+      setPendingRoasts(updated);
+      localStorage.setItem("dpm_pending_roasts", JSON.stringify(updated));
+
+      if (data.link) {
+        window.open(data.link, "_blank");
+      }
     } catch {
       console.warn("PIX não configurado — modo dev");
       setRoastId("dev-" + Date.now());
     }
   };
 
-  const startRoast = async () => {
+  const startRoast = async (item?: PendingRoast) => {
+    const rUrl = item ? item.url : url;
+    const rName = item ? item.userName : userName;
+    const rAnon = item ? item.anonymous : anonymous;
+    const rId = item ? item.roastId : roastId;
+
     clearInterval(pollingRef.current!);
     setStep("loading");
     setLoadingProgress(0);
@@ -217,7 +296,7 @@ export default function Home() {
       const res = await fetch("/api/roast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, userName, anonymous, roastId }),
+        body: JSON.stringify({ url: rUrl, userName: rName, anonymous: rAnon, roastId: rId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao gerar roast");
@@ -238,16 +317,24 @@ export default function Home() {
 
   const handleDevSkipPayment = () => startRoast();
 
-  const handleCopyPix = () => {
-    navigator.clipboard.writeText(pixCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
+
 
   const handleReset = () => {
     setUrl(""); setUserName(""); setNameInput("");
-    setResult(null); setError(""); setPixCode("");
-    setPixQrImage(""); setRoastId(""); setStep("home");
+    setResult(null); setError(""); setPixLink("");
+
+    // Remove APENAS o ativo da memória (localStorage e array de polling), preservando outros pendentes
+    if (roastId) {
+      const updated = pendingRoasts.filter(p => p.roastId !== roastId);
+      setPendingRoasts(updated);
+      if (updated.length > 0) {
+        localStorage.setItem("dpm_pending_roasts", JSON.stringify(updated));
+      } else {
+        localStorage.removeItem("dpm_pending_roasts");
+      }
+    }
+
+    setRoastId(""); setStep("home");
     setPixStatus("waiting");
     clearInterval(pollingRef.current!);
   };
@@ -438,17 +525,15 @@ export default function Home() {
             <p className="text-[#1DB954]/80 text-xs mb-5">
               Se não puder pagar os 4,97, a humilhação é ainda maior.
             </p>
-            {pixQrImage ? (
-              <img src={`data:image/png;base64,${pixQrImage}`} alt="QR Code PIX" className="mx-auto mb-4 w-36 h-36 rounded-xl" />
-            ) : (
-              <div className="mx-auto mb-4 w-36 h-36 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center">
-                <p className="text-xs text-gray-600">QR Code</p>
-              </div>
-            )}
-            <p className="text-xs text-gray-600 mb-2 uppercase tracking-widest">Copia e cola</p>
-            <button onClick={handleCopyPix} className="w-full text-xs py-3 rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] text-gray-500 hover:text-white hover:border-[#1DB954]/40 transition-all mb-5 truncate px-3">
-              {copied ? "✓ Copiado!" : pixCode ? pixCode.slice(0, 42) + "..." : "Gerando PIX..."}
-            </button>
+            <div className="mx-auto mb-6 w-full flex item-center justify-center">
+              <button
+                onClick={() => pixLink && window.open(pixLink, "_blank")}
+                disabled={!pixLink}
+                className="w-full bg-[#1DB954] hover:bg-green-500 disabled:bg-gray-700 text-black font-black py-4 rounded-xl text-sm transition-all"
+              >
+                {pixLink ? "💳 ABRIR CHECKOUT" : "Gerando Link de Pagamento..."}
+              </button>
+            </div>
             <div className="mb-5 py-3 rounded-xl bg-[#111] border border-[#1a1a1a]">
               {pixStatus === "paid" ? (
                 <p className="text-[#1DB954] text-sm font-black">✓ Pagamento confirmado! Iniciando destruição…</p>
@@ -458,13 +543,13 @@ export default function Home() {
                 <p className="text-gray-600 text-xs">⏳ Aguardando seu PIX…</p>
               )}
             </div>
-            {(roastId.startsWith("dev-") || process.env.NODE_ENV === "development") && (
+            {(process.env.NODE_ENV === "development") && (
               <button onClick={handleDevSkipPayment} className="w-full bg-[#1DB954] hover:bg-[#1ed760] text-black font-black py-4 rounded-xl text-sm tracking-widest uppercase transition-all active:scale-95 mb-3" style={{ boxShadow: "0 4px 20px rgba(29,185,84,0.3)" }}>
                 🛠 DEV: Pular Pagamento
               </button>
             )}
-            <button onClick={() => setStep("home")} className="text-xs text-gray-700 hover:text-gray-500 transition-colors uppercase tracking-widest block w-full">
-              Voltar
+            <button onClick={handleReset} className="text-xs text-gray-700 hover:text-red-500 transition-colors uppercase tracking-widest block w-full mt-4">
+              Cancelar e Voltar do Início
             </button>
           </div>
         </div>
@@ -516,7 +601,11 @@ export default function Home() {
           <span>🔥</span> RECENTEMENTE DESTRUÍDAS
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-          {recentRoasts.map((item) => <RoastCard key={item.id} data={item} />)}
+          {isFetchingRecent ? (
+            Array.from({ length: 4 }).map((_, i) => <RoastCardSkeleton key={i} />)
+          ) : (
+            recentRoasts.map((item) => <RoastCard key={item.id} data={item} />)
+          )}
         </div>
       </div>
 
@@ -525,6 +614,32 @@ export default function Home() {
         <p className="text-xs text-gray-600 leading-relaxed uppercase tracking-tighter">
           Ei, ei, ei! <br />Você sabe que é apenas humor e não vai acabar a nossa amizade por isso, né?
         </p>
+      </div>
+    </div>
+  );
+}
+
+function RoastCardSkeleton() {
+  return (
+    <div className="bg-[#121212] border border-[#282828] rounded-2xl p-6 shadow-sm animate-pulse">
+      <div className="flex justify-between items-center mb-4">
+        <div className="h-5 bg-[#282828] rounded w-1/3"></div>
+        <div className="h-6 bg-[#282828] rounded w-12"></div>
+      </div>
+      <div className="mb-6">
+        <div className="h-4 bg-[#282828] rounded w-full mb-2"></div>
+        <div className="h-4 bg-[#282828] rounded w-5/6"></div>
+      </div>
+      <div className="space-y-4">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="space-y-1">
+            <div className="flex justify-between mb-1">
+              <div className="h-3 bg-[#282828] rounded w-1/4"></div>
+              <div className="h-3 bg-[#282828] rounded w-8"></div>
+            </div>
+            <div className="w-full bg-[#282828] rounded-full h-1.5"></div>
+          </div>
+        ))}
       </div>
     </div>
   );

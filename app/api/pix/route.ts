@@ -38,6 +38,12 @@ export async function POST(req: NextRequest) {
           quantity: 1,
           price: 497, // R$4,97 em centavos
         }],
+        customer: {
+          name: userName,
+          cellphone: "", // Accepts empty string as well!
+          email: "seuemail@gmail.com", // Requires valid e-mail format, can't be empty
+          taxId: "" // Abacate Pay accepts empty string instead of real CPF
+        },
         returnUrl: `${process.env.NEXT_PUBLIC_URL}`,
         completionUrl: `${process.env.NEXT_PUBLIC_URL}`,
       }),
@@ -45,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     const billing = await res.json();
 
-    if(!billing.success) {
+    if (!billing.success) {
       throw new Error(billing.error);
     }
 
@@ -57,16 +63,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       roastId: roast.id,
-      pixCode: billing.data?.pixQrCode ?? "",
-      pixQrCodeImage: billing.data?.pixQrCodeImage ?? "",
+      link: billing?.data?.url,
     });
   } catch (err: any) {
     console.error("Erro /api/pix:", err);
     // Em dev sem AbacatePay configurado, retorna mock pra não travar
     return NextResponse.json({
       roastId: "dev-" + Date.now(),
-      pixCode: "00020126580014br.gov.bcb.pix0136dev@teste.com5204000053039865406497005802BR5910DevTest6009SaoPaulo6304ABCD",
-      pixQrCodeImage: "",
+      link: "https://abacatepay.com/pay/mock",
     });
   }
 }

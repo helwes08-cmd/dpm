@@ -1,17 +1,34 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
+const createWindow = (count: number | null = 4) => {
+  const totalCount = count || 0;
+  if (totalCount < 4) {
+    return { start: 0, end: totalCount };
+  }
+
+  const start = Math.floor(Math.random() * (totalCount - 3));
+  return { start, end: start + 3 };
+}
+
 export async function GET() {
   try {
     const supabase = getSupabaseAdmin();
 
+    const { count } = await supabase
+      .from("playlist_roasts")
+      .select("*", { count: "exact", head: true })
+      .eq("paid", true)
+      .not("roast", "is", null);
+
+    const { start, end } = createWindow(count);
     const { data, error } = await supabase
       .from("playlist_roasts")
-      .select(
-      "*",
-      )
+      .select("*")
+      .eq("paid", true)
+      .not("roast", "is", null)
       .order("created_at", { ascending: false })
-      .limit(10);
+      .range(start, end);
 
     if (error) {
       // eslint-disable-next-line no-console
@@ -22,17 +39,13 @@ export async function GET() {
     const roasts =
       data?.map((row) => ({
         id: row.id,
+        userName: row.anonymous ? "Anônimo" : row.user_name,
         score: row.score,
         roast: row.roast,
         spotifyUrl: row.spotify_url,
         youtubeUrl: row.youtube_url,
         createdAt: row.created_at,
-        metrics: {
-          originalidade: row.originalidade ?? 0,
-          influenciaDoAlgoritmo: row.influencia_do_algoritmo ?? 0,
-          energiaDeTermino: row.energia_de_termino ?? 0,
-          vergonhaAlheia: row.vergonha_alheia ?? 0,
-        },
+        tags: row.tags
       })) ?? [];
 
     return NextResponse.json({ roasts });
