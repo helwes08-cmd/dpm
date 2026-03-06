@@ -24,7 +24,8 @@ type RoastResult = {
 
 type PendingRoast = {
   roastId: string;
-  pixLink: string;
+  brCode?: string;
+  brCodeBase64?: string;
   userName: string;
   url: string;
   anonymous: boolean;
@@ -95,12 +96,14 @@ export default function Home() {
   const [result, setResult] = useState<RoastResult | null>(null);
   const [error, setError] = useState("");
   const [urlError, setUrlError] = useState("");
-  const [pixLink, setPixLink] = useState("");
+  const [brCode, setBrCode] = useState("");
+  const [brCodeBase64, setBrCodeBase64] = useState("");
   const [roastId, setRoastId] = useState("");
   const [loadingPhrases] = useState(() => pickThree(LOADING_PHRASES));
   const [loadingIndex, setLoadingIndex] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [pixStatus, setPixStatus] = useState<"waiting" | "checking" | "paid">("waiting");
+  const [copied, setCopied] = useState(false);
   const [recentRoasts, setRecentRoasts] = useState<RecentRoast[]>([]);
   const [isFetchingRecent, setIsFetchingRecent] = useState(true);
   const [pendingRoasts, setPendingRoasts] = useState<PendingRoast[]>([]);
@@ -137,7 +140,8 @@ export default function Home() {
           // Se já tem pendências, restaura a última na tela
           const last = saved[saved.length - 1];
           setRoastId(last.roastId);
-          setPixLink(last.pixLink);
+          setBrCode(last.brCode ?? "");
+          setBrCodeBase64(last.brCodeBase64 ?? "");
           setUserName(last.userName);
           setUrl(last.url);
           setAnonymous(last.anonymous);
@@ -185,7 +189,7 @@ export default function Home() {
         setUrl(paidItem.url);
         setStep("payment");
         setPixStatus("paid");
-        setTimeout(() => startRoast(paidItem), 800);
+        setTimeout(() => startRoast(paidItem), 1200);
       } else if (step === "payment") {
         setPixStatus("waiting");
       }
@@ -259,12 +263,14 @@ export default function Home() {
         body: JSON.stringify({ userName: name, playlistUrl: url, anonymous }),
       });
       const data = await res.json();
-      setPixLink(data.link ?? "");
+      setBrCode(data.brCode ?? "");
+      setBrCodeBase64(data.brCodeBase64 ?? "");
       setRoastId(data.roastId ?? "");
 
       const newItem: PendingRoast = {
         roastId: data.roastId,
-        pixLink: data.link,
+        brCode: data.brCode,
+        brCodeBase64: data.brCodeBase64,
         userName: name,
         url: url,
         anonymous: anonymous
@@ -272,10 +278,6 @@ export default function Home() {
       const updated = [...pendingRoasts, newItem];
       setPendingRoasts(updated);
       localStorage.setItem("dpm_pending_roasts", JSON.stringify(updated));
-
-      if (data.link) {
-        window.open(data.link, "_blank");
-      }
     } catch {
       console.warn("PIX não configurado — modo dev");
       setRoastId("dev-" + Date.now());
@@ -321,7 +323,7 @@ export default function Home() {
 
   const handleReset = () => {
     setUrl(""); setUserName(""); setNameInput("");
-    setResult(null); setError(""); setPixLink("");
+    setResult(null); setError(""); setBrCode(""); setBrCodeBase64("");
 
     // Remove APENAS o ativo da memória (localStorage e array de polling), preservando outros pendentes
     if (roastId) {
@@ -508,7 +510,7 @@ export default function Home() {
               CONTINUAR →
             </button>
             <button onClick={() => setStep("home")} className="mt-3 text-xs text-gray-700 hover:text-gray-500 transition-colors uppercase tracking-widest block w-full">
-              Cancelar
+              Cancelar e Voltar ao Início
             </button>
           </div>
         </div>
@@ -520,19 +522,34 @@ export default function Home() {
           <div className="w-full max-w-sm bg-[#0f0f0f] border border-[#222] rounded-3xl p-8 text-center" style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.8)" }}>
             <p className="text-3xl mb-2">💸</p>
             <h2 className="text-white font-black text-xl mb-1" style={{ fontFamily: "'Arial Black', sans-serif" }}>
-              A humilhação custa R$ 4,97
+              R$ 4,97 pra gente ter coragem de ouvir :)
             </h2>
             <p className="text-[#1DB954]/80 text-xs mb-5">
-              Se não puder pagar os 4,97, a humilhação é ainda maior.
+              Você já pagou mais por coisa pior...
             </p>
-            <div className="mx-auto mb-6 w-full flex item-center justify-center">
-              <button
-                onClick={() => pixLink && window.open(pixLink, "_blank")}
-                disabled={!pixLink}
-                className="w-full bg-[#1DB954] hover:bg-green-500 disabled:bg-gray-700 text-black font-black py-4 rounded-xl text-sm transition-all"
-              >
-                {pixLink ? "💳 ABRIR CHECKOUT" : "Gerando Link de Pagamento..."}
-              </button>
+            <div className="mx-auto mb-6 w-full flex flex-col items-center justify-center gap-4">
+              {brCodeBase64 ? (
+                <>
+                  <img src={brCodeBase64} alt="QR Code PIX" className="w-48 h-48 mx-auto rounded-xl p-2 bg-white" />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(brCode);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="w-full bg-[#1DB954] hover:bg-green-500 text-black font-black py-4 rounded-xl text-sm transition-all"
+                  >
+                    {copied ? "✓ Copiado" : "Pix Copia e Cola"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  disabled
+                  className="w-full bg-[#1a1a1a] text-gray-400 font-bold py-4 rounded-xl animate-pulse text-sm transition-all"
+                >
+                  Gerando PIX...
+                </button>
+              )}
             </div>
             <div className="mb-5 py-3 rounded-xl bg-[#111] border border-[#1a1a1a]">
               {pixStatus === "paid" ? (
