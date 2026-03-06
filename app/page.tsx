@@ -342,12 +342,12 @@ export default function Home() {
   };
 
   const shareText = result
-    ? `🎧 Playlist de ${result.userName} destruída pela IA — Score ${result.score.toFixed(1)}/10\n${result.roast}\n\nDestrua a sua: destroyaplaylist.com`
+    ? `🎧 Playlist de ${result.userName} destruída pela IA — Score ${result.score.toFixed(1)}/10\n${result.roast}\n\nDestrua a sua: www.destruaminhaplaylist.com.br`
     : "";
 
   const shareInstagram = () => {
     if (navigator.share) {
-      navigator.share({ title: "Minha Playlist foi Destruída 💀", text: shareText, url: "https://destroyaplaylist.com" });
+      navigator.share({ title: "Minha Playlist foi Destruída 💀", text: shareText, url: "https://www.destruaminhaplaylist.com.br" });
     } else {
       navigator.clipboard.writeText(shareText);
       alert("Texto copiado! Cole nos seus Stories do Instagram.");
@@ -355,7 +355,7 @@ export default function Home() {
   };
   const shareWhatsapp = () => window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank");
   const shareTwitter = () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`, "_blank");
-  const shareFacebook = () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent("https://destroyaplaylist.com")}&quote=${encodeURIComponent(shareText)}`, "_blank");
+  const shareFacebook = () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent("https://www.destruaminhaplaylist.com.br")}&quote=${encodeURIComponent(shareText)}`, "_blank");
 
   // ─── LOADING ─────────────────────────────────────────────────────────────────
   if (step === "loading") return (
@@ -404,7 +404,7 @@ export default function Home() {
             style={{ background: "radial-gradient(ellipse, #1DB954, transparent)" }} />
 
           <p className="text-[9px] text-[#1DB954]/50 uppercase tracking-[0.3em] mb-6 text-center font-bold">
-            destroyaplaylist.com
+            www.destruaminhaplaylist.com.br
           </p>
 
           {/* Nome */}
