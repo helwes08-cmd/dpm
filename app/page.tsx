@@ -584,18 +584,24 @@ export default function Home() {
       {/* INPUT */}
       <div className="w-full max-w-2xl mb-16">
         {urlError && <p className="text-red-500 text-sm mt-2 px-2">{urlError}</p>}
-        <div className="relative flex items-center mb-4">
-          <span className="absolute left-4 text-gray-500 text-xl">🎧</span>
-          <input
-            ref={inputRef}
-            value={url}
-            onChange={(e) => handleUrlChange(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleDestroy()}
-            type="text"
-            placeholder="Link do Spotify ou YouTube..."
-            className="w-full py-5 pl-12 pr-32 rounded-xl text-lg bg-[#1a1a1a] border border-[#333] text-white focus:border-[#1DB954] focus:outline-none transition-all"
-          />
-          <button onClick={handleDestroy} disabled={loading || !!urlError || !url} className="absolute right-2 bg-[#1DB954] hover:bg-green-500 text-black font-bold py-3 px-6 rounded-lg transition-all active:scale-95">
+        <div className="flex flex-col min-[480px]:relative min-[480px]:flex-row items-center mb-4 gap-4 min-[480px]:gap-0">
+          <div className="relative w-full">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-xl">🎧</span>
+            <input
+              ref={inputRef}
+              value={url}
+              onChange={(e) => handleUrlChange(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleDestroy()}
+              type="text"
+              placeholder="Link do Spotify ou YouTube..."
+              className="w-full py-5 pl-12 pr-4 min-[480px]:pr-32 rounded-xl text-lg bg-[#1a1a1a] border border-[#333] text-white focus:border-[#1DB954] focus:outline-none transition-all"
+            />
+          </div>
+          <button
+            onClick={handleDestroy}
+            disabled={loading || !!urlError || !url}
+            className="w-full min-[480px]:w-auto min-[480px]:absolute min-[480px]:right-2 bg-[#1DB954] hover:bg-green-500 text-black font-bold py-3 px-6 rounded-lg transition-all active:scale-95 whitespace-nowrap"
+          >
             {loading ? "JULGANDO..." : "DESTRUIR"}
           </button>
         </div>
