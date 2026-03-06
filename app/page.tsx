@@ -530,7 +530,7 @@ export default function Home() {
             <div className="mx-auto mb-6 w-full flex flex-col items-center justify-center gap-4">
               {brCodeBase64 ? (
                 <>
-                  <img src={brCodeBase64} alt="QR Code PIX" className="w-48 h-48 mx-auto rounded-xl p-2 bg-white" />
+                  <img src={`data:image/png;base64,${brCodeBase64}`} alt="QR Code PIX" className="w-48 h-48 mx-auto rounded-xl p-2 bg-white" />
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(brCode);
