@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { MercadoPagoConfig, Payment } from "mercadopago";
 
 const rateLimit = new Map<string, number[]>();
+
+// Configura Mercado Pago
+const client = new MercadoPagoConfig({
+  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN || "",
+});
+const payment = new Payment(client);
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,49 +45,54 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    // Cria cobrança PIX no AbacatePay
-    const res = await fetch("https://api.abacatepay.com/v1/pixQrCode/create", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.ABACATEPAY_API_KEY}`,
-      },
-      body: JSON.stringify({
-        amount: 497, // R$4,97 em centavos
-        expiresIn: 3600, // 1 hour
-        description: `Roast da playlist de ${userName}`,
-        customer: {
-          name: userName,
-          cellphone: "", // Accepts empty string as well!
-          email: "seuemail@gmail.com", // Requires valid e-mail format, can't be empty
-          taxId: "" // Abacate Pay accepts empty string instead of real CPF
+    // Cria cobrança PIX no Mercado Pago
+    // Nota: MP exige e-mail e identificação válida para PIX
+    const body = {
+      transaction_amount: 4.97,
+      description: `Roast da playlist de ${userName}`,
+      payment_method_id: "pix",
+      payer: {
+        email: "comprador@destruaminhaplaylist.com.br", // E-mail padrão para garantir a criação
+        first_name: userName.split(" ")[0] || "Comprador",
+        last_name: userName.split(" ").slice(1).join(" ") || "Playlist",
+        identification: {
+          type: "CNPJ",
+          number: "51175207000138", // CNPJ fornecido (sanitizado)
         },
-      }),
-    });
+      },
+    };
 
-    const pixResponse = await res.json();
+    const mpResponse = await payment.create({ body });
 
-    if (!pixResponse.success) {
-      throw new Error(pixResponse.error);
+    if (!mpResponse.id) {
+      throw new Error("Erro ao criar pagamento no Mercado Pago");
     }
 
-    // Salva payment_id
+    // Salva payment_id (ID numérico do MP)
     await supabase
       .from("playlist_roasts")
-      .update({ payment_id: pixResponse.data?.id })
+      .update({ payment_id: mpResponse.id.toString() })
       .eq("id", roast.id);
 
     return NextResponse.json({
       roastId: roast.id,
-      brCode: pixResponse.data?.brCode,
-      brCodeBase64: pixResponse.data?.brCodeBase64,
+      brCode: mpResponse.point_of_interaction?.transaction_data?.qr_code,
+      brCodeBase64: mpResponse.point_of_interaction?.transaction_data?.qr_code_base64,
     });
   } catch (err: any) {
     console.error("Erro /api/pix:", err);
-    // Em dev sem AbacatePay configurado, retorna mock pra não travar
-    return NextResponse.json({
-      roastId: "dev-" + Date.now(),
-      link: "https://abacatepay.com/pay/mock",
-    });
+    // Erro detalhado se disponível na resposta do SDK
+    const errorMsg = err.message || "Algo deu errado ao gerar o PIX.";
+
+    // Retorno mock para não travar se as chaves não estiverem configuradas corretamente
+    if (process.env.NODE_ENV === "development") {
+      return NextResponse.json({
+        roastId: "dev-" + Date.now(),
+        brCode: "00020101021226810014br.gov.bcb.pix...",
+        brCodeBase64: "iVBORw0KGgoAAAANSUhEUgA...", // Mock base64
+      });
+    }
+
+    return NextResponse.json({ error: errorMsg }, { status: 500 });
   }
 }
